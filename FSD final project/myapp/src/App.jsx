@@ -9,11 +9,30 @@ import ProjectDetails from "./components/ProjectDetails";
 import ProjectForm from "./components/ProjectForm";
 import User from "./components/User";
 import Task from "./components/Task";
+import Sprint from "./components/Sprint";
+import DailyPlanner from "./components/DailyPlanner";
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const user = JSON.parse(localStorage.getItem("user"));
   return user ? children : <Navigate to="/login" />;
+};
+
+// Admin Only Route Component
+const AdminRoute = ({ children }) => {
+  const user = JSON.parse(localStorage.getItem("user"));
+  const isAdmin = user?.userType === "Admin" || user?.role === "Admin";
+  
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+  
+  if (!isAdmin) {
+    // Redirect non-admin users to projects page
+    return <Navigate to="/projects" />;
+  }
+  
+  return children;
 };
 
 // Layout Component
@@ -48,14 +67,22 @@ const App = () => {
             </ProtectedRoute>
           } 
         />
-        
-        <Route 
-          path="/projects/new" 
+         <Route 
+          path="/" 
           element={
             <ProtectedRoute>
-              <Layout>
-                <ProjectForm />
-              </Layout>
+              <Navigate to="/projects" />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/sprint" 
+          element={
+            <ProtectedRoute>
+             <Layout>
+              <Sprint/>
+             </Layout>
             </ProtectedRoute>
           } 
         />
@@ -70,7 +97,16 @@ const App = () => {
             </ProtectedRoute>
           } 
         />
-        
+        <Route 
+  path="/daily-planner" 
+  element={
+    <ProtectedRoute>
+      <Layout>
+        <DailyPlanner />
+      </Layout>
+    </ProtectedRoute>
+  } 
+/>
         <Route 
           path="/projects/:id/edit" 
           element={
@@ -94,13 +130,25 @@ const App = () => {
         />
         
         <Route 
-          path="/users" 
+          path="/sprint" 
           element={
             <ProtectedRoute>
               <Layout>
-                <User />
+                <Sprint />
               </Layout>
             </ProtectedRoute>
+          } 
+        />
+        
+        {/* Admin Only Route - Users */}
+        <Route 
+          path="/users" 
+          element={
+            <AdminRoute>
+              <Layout>
+                <User />
+              </Layout>
+            </AdminRoute>
           } 
         />
         

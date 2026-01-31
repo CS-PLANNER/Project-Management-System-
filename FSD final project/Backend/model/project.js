@@ -35,6 +35,9 @@ const projectSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "user"
     }
-}, { timestamps: true });
+}, { 
+    timestamps: true,
+    collection: 'projects' // Explicitly set collection name
+});
 
 module.exports = mongoose.model("project", projectSchema);

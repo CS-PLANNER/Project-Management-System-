@@ -25,6 +25,9 @@ const userSchema = new mongoose.Schema({
         enum: ['Admin', 'Frontend Developer', 'Backend Developer', 'QA', 'Project Manager', 'UI/UX Designer'],
         default: 'Frontend Developer'
     }
-}, { timestamps: true });
+}, { 
+    timestamps: true,
+    collection: 'users' // Explicitly set collection name
+});
 
 module.exports = mongoose.model("user", userSchema);

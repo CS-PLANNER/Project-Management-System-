@@ -1,34 +1,61 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Edit2, Calendar, Users } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom"; // Added useParams
+import { Eye, Edit2, Trash2, Calendar, Plus, Users, RefreshCw, ArrowLeft } from "lucide-react"; // Added ArrowLeft
 import axios from "axios";
 
-const ProjectDetails = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const [project, setProject] = useState(null);
+const ProjectDetails = () => { // Changed from ProjectList to ProjectDetails
+  const { id } = useParams(); // Get project ID from URL
+  const [project, setProject] = useState(null); // Changed from projects to project
   const [loading, setLoading] = useState(true);
-  const API_URL = "http://localhost:3008"; // Fixed: Changed from 3004 to 3008
+  const [refreshing, setRefreshing] = useState(false);
+  const navigate = useNavigate();
+  const API_URL = "http://localhost:3008";
 
   useEffect(() => {
     if (id) {
-      fetchProjectDetails();
+      fetchProject();
     }
   }, [id]);
 
-  const fetchProjectDetails = async () => {
+  const fetchProject = async () => {
     try {
-      const response = await axios.get(`${API_URL}/projects/${id}`);
-      setProject(response.data);
+      console.log("🔄 Fetching project details...");
+      setLoading(true);
+      
+      // Changed endpoint from /projects to /projects/:id
+      const response = await axios.get(`${API_URL}/projects/${id}`, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+      
+      console.log(`✅ Found project:`, response.data);
+      setProject(response.data); // Changed from setProjects to setProject
     } catch (error) {
-      console.error("Error fetching project:", error);
-      alert("Failed to load project details");
-      navigate("/projects");
+      console.error("❌ Error fetching project details:", error);
+      
+      if (error.response && error.response.status === 404) {
+        console.log("⚠️  Project not found");
+        alert("Project not found");
+        navigate("/projects");
+      } else {
+        alert("Failed to load project details. Please check your connection.");
+      }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchProject();
+  };
+
+  // Remove the handleDelete function since it's not needed in details view
+  
   if (loading) {
     return (
       <div className="loading">
@@ -60,6 +87,10 @@ const ProjectDetails = () => {
         </button>
         
         <div className="header-actions">
+          <button onClick={handleRefresh} className="btn-secondary" disabled={refreshing}>
+            <RefreshCw size={16} className={refreshing ? "spinning" : ""} />
+            Refresh
+          </button>
           <button
             onClick={() => navigate(`/projects/${id}/edit`)}
             className="btn-primary"

@@ -7,13 +7,22 @@ const taskSchema = new mongoose.Schema({
     },
     description: String,
     projectId: {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
         ref: "project",
         required: true
     },
-    assignedTo: [{
+    sprintId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "user"
+        ref: "sprint"
+    },
+    assignedTo: [{
+        userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "user"
+        },
+        name: String,
+        employeeCode: String,
+        role: String
     }],
     status: {
         type: String,
@@ -22,7 +31,7 @@ const taskSchema = new mongoose.Schema({
     },
     priority: {
         type: String,
-        enum: ["Low", "Medium", "High"],
+        enum: ["Low", "Medium", "High", "Urgent"],
         default: "Medium"
     },
     startDate: Date,
@@ -31,6 +40,9 @@ const taskSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "user"
     }
-}, { timestamps: true });
+}, { 
+    timestamps: true,
+    collection: 'tasks' // Explicitly set collection name
+});
 
 module.exports = mongoose.model("task", taskSchema);
