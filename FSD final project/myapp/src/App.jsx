@@ -67,14 +67,6 @@ const App = () => {
             </ProtectedRoute>
           } 
         />
-         <Route 
-          path="/" 
-          element={
-            <ProtectedRoute>
-              <Navigate to="/projects" />
-            </ProtectedRoute>
-          } 
-        />
         
         <Route 
           path="/sprint" 
@@ -129,16 +121,6 @@ const App = () => {
           } 
         />
         
-        <Route 
-          path="/sprint" 
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Sprint />
-              </Layout>
-            </ProtectedRoute>
-          } 
-        />
         
         {/* Admin Only Route - Users */}
         <Route 

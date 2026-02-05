@@ -55,35 +55,28 @@ const Login = () => {
       }
       
     } catch (error) {
-      console.error("🔥 Login error:", error);
-      
-      if (error.response) {
-        const status = error.response.status;
-        const message = error.response.data?.message || "Login failed";
-        
-        if (status === 401) {
-          alert("❌ Invalid email or password\n\nUse: admin@example.com / admin@123");
-        } else if (status === 404) {
-          alert("❌ User not found\n\nUse: admin@example.com / admin@123");
-        } else if (status === 500) {
-          alert("❌ Server error. Check backend console.");
-        } else {
-          alert(`❌ Error ${status}: ${message}`);
-        }
-      } else if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
-        alert(
-          "❌ Cannot connect to backend server.\n\n" +
-          `Make sure:\n` +
-          `1. Backend is running (node index.js)\n` +
-          `2. Port 3008 is free\n` +
-          `3. Check: http://localhost:3008/api/health`
-        );
-      } else if (error.request) {
-        alert("❌ No response from server. Backend might not be running.");
-      } else {
-        alert("❌ Error: " + error.message);
-      }
-    } finally {
+  console.error("🔥 Login error:", error);
+  
+  if (error.response) {
+    const status = error.response.status;
+    const message = error.response.data?.message || "Login failed";
+    
+    if (status === 401 || status === 404) {
+      // ✅ REMOVED admin credentials from alert
+      alert("❌ Invalid email or password");
+    } else if (status === 500) {
+      alert("❌ Server error. Check backend console.");
+    } else {
+      alert(`❌ Error: ${message}`);
+    }
+  } else if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
+    alert("❌ Cannot connect to backend server.");
+  } else if (error.request) {
+    alert("❌ No response from server.");
+  } else {
+    alert("❌ Error: " + error.message);
+  }
+} finally {
       setLoading(false);
     }
   };

@@ -261,19 +261,21 @@ const Task = () => {
 
           <div className="form-group">
             <label>Select Sprint *</label>
-            <select
-              name="sprintId"
-              value={formData.sprintId}
-              onChange={handleSprintChange}
-              required
-            >
-              <option value="">Select a sprint</option>
-              {sprints.map(sprint => (
-                <option key={sprint._id} value={sprint._id}>
-                  {sprint.sprintName} ({sprint.status})
-                </option>
-              ))}
-            </select>
+            // Line 268-271 in Task.jsx:
+<select
+  name="sprintId"
+  value={formData.sprintId}
+  onChange={handleSprintChange}
+  required
+>
+  <option value="">Select a sprint</option>
+  {/* Add null check: */}
+  {sprints && Array.isArray(sprints) ? sprints.map(sprint => (
+    <option key={sprint._id} value={sprint._id}>
+      {sprint.sprintName} ({sprint.status})
+    </option>
+  )) : <option disabled>Loading sprints...</option>}
+</select>
           </div>
 
           <div className="form-group">
