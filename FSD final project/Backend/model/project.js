@@ -25,7 +25,7 @@ const projectSchema = new mongoose.Schema({
     teamMembers: [{
         userId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: "user"
+            ref: "User"
         },
         name: String,
         employeeCode: String,
@@ -33,7 +33,7 @@ const projectSchema = new mongoose.Schema({
     }],
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "user"
+        ref: "User"
     }
 }, { 
     timestamps: true,

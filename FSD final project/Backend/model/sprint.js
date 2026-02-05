@@ -20,7 +20,7 @@ const sprintSchema = new mongoose.Schema({
     assignedUsers: [{
         userId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: "user"
+            ref: "User"
         },
         name: String,
         employeeCode: String,
@@ -37,7 +37,7 @@ const sprintSchema = new mongoose.Schema({
     },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "user"
+        ref: "User"
     }
 }, { 
     timestamps: true,

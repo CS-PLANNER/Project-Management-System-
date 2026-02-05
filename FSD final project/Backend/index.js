@@ -147,11 +147,23 @@ app.post("/login", async (req, res) => {
     if (!user) {
       console.log("❌ User not found:", email);
       return res.status(404).json({ 
-        message: "User not found. Use: admin@example.com"
+        message: "Invalid email or password"  // ✅ Changed message
       });
     }
     
-    if (user.password === password) {
+    let isPasswordValid = false;
+    
+    // Try bcrypt compare first
+    if (user.password.startsWith('$2')) {
+      // Password is hashed, use bcrypt
+      const bcrypt = require('bcrypt');
+      isPasswordValid = await bcrypt.compare(password, user.password);
+    } else {
+      // Password is plain text (old users)
+      isPasswordValid = user.password === password;
+    }
+    
+    if (isPasswordValid) {
       console.log("✅ Login successful for:", user.name);
       return res.json({
         message: "Logged in successfully",
@@ -165,11 +177,12 @@ app.post("/login", async (req, res) => {
     } else {
       console.log("❌ Password mismatch");
       return res.status(401).json({ 
-        message: "Invalid password"
+        message: "Invalid email or password"  // ✅ Changed message
       });
     }
   } catch (error) {
     console.error("🔥 Login error:", error);
+    console.error("Error stack:", error.stack);
     res.status(500).json({ 
       message: "Login failed",
       error: error.message 
@@ -284,12 +297,40 @@ app.post("/users/add", async (req, res) => {
     }
     
     console.log("👤 Creating user:", req.body.name);
+    console.log("📧 Email:", req.body.email);
+    console.log("🔑 Raw password (will be hashed):", req.body.password);
+    
+    // Create the user - password will be auto-hashed by pre-save hook
     const user = await userModel.create(req.body);
-    console.log("✅ User created:", user._id);
-    res.json({ message: "User added successfully!", user });
+    
+    console.log("✅ User created with ID:", user._id);
+    console.log("✅ Hashed password:", user.password.substring(0, 30) + "...");
+    
+    res.json({ 
+      message: "User added successfully!", 
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        employeeCode: user.employeeCode
+      }
+    });
   } catch (error) {
-    console.error("❌ Error adding user:", error);
-    res.status(500).json({ message: "Error adding user", error: error.message });
+    console.error("❌ Error adding user:", error.message);
+    console.error("Full error:", error);
+    
+    // Handle duplicate email/employeeCode
+    if (error.code === 11000) {
+      return res.status(400).json({ 
+        message: "Email or Employee Code already exists" 
+      });
+    }
+    
+    res.status(500).json({ 
+      message: "Error adding user", 
+      error: error.message
+    });
   }
 });
 

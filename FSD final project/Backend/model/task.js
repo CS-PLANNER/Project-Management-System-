@@ -18,7 +18,7 @@ const taskSchema = new mongoose.Schema({
     assignedTo: [{
         userId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: "user"
+            ref: "User"
         },
         name: String,
         employeeCode: String,
@@ -38,7 +38,7 @@ const taskSchema = new mongoose.Schema({
     endDate: Date,
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "user"
+        ref: "User"
     }
 }, { 
     timestamps: true,
