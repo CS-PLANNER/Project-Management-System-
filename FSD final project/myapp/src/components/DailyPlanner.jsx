@@ -9,6 +9,10 @@ const DailyPlanner = () => {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [loading, setLoading] = useState(false);
   
+  // Get current user info
+  const currentUser = JSON.parse(localStorage.getItem('user'));
+  const isAdmin = currentUser?.role === 'Admin';
+  
   const [formData, setFormData] = useState({
     taskName: '',
     date: new Date().toISOString().split('T')[0],
@@ -26,7 +30,13 @@ const DailyPlanner = () => {
 
   const fetchTasks = async () => {
     try {
-      const response = await fetch('http://localhost:3008/tasks');
+      const url = new URL('http://localhost:3008/tasks');
+      if (currentUser) {
+        url.searchParams.append('userId', currentUser.userId);
+        url.searchParams.append('role', currentUser.role);
+      }
+      
+      const response = await fetch(url);
       const data = await response.json();
       setTasks(data);
     } catch (error) {
@@ -48,7 +58,13 @@ const DailyPlanner = () => {
 
   const fetchDailyTasks = async () => {
     try {
-      const response = await fetch('http://localhost:3008/daily-tasks');
+      const url = new URL('http://localhost:3008/daily-tasks');
+      if (currentUser) {
+        url.searchParams.append('userId', currentUser.userId);
+        url.searchParams.append('role', currentUser.role);
+      }
+      
+      const response = await fetch(url);
       const data = await response.json();
       setDailyTasks(data);
     } catch (error) {
@@ -69,9 +85,7 @@ const DailyPlanner = () => {
     setFormData(prev => ({ 
       ...prev, 
       taskId,
-      // Set task name from selected task
       taskName: selectedTask ? selectedTask.title : '',
-      // Clear assigned users when task changes
       assignedUsers: []
     }));
   };
@@ -80,7 +94,6 @@ const DailyPlanner = () => {
     const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
     const selectedUsers = users.filter(user => selectedOptions.includes(user._id));
     
-    // Format assignedUsers as expected by backend
     const assignedUsers = selectedUsers.map(user => ({
       userId: user._id,
       name: user.name,
@@ -101,10 +114,9 @@ const DailyPlanner = () => {
     setLoading(true);
 
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
       const dailyTaskData = {
         ...formData,
-        createdBy: user.userId
+        createdBy: currentUser.userId
       };
 
       const response = await fetch('http://localhost:3008/daily-tasks/add', {
@@ -125,7 +137,7 @@ const DailyPlanner = () => {
           description: '',
           status: 'Pending'
         });
-        fetchDailyTasks(); // Refresh daily tasks list
+        fetchDailyTasks();
       } else {
         showMessage('error', result.message || 'Error creating daily task');
       }
@@ -138,7 +150,6 @@ const DailyPlanner = () => {
   };
 
   const handleCancel = () => {
-    // Reset form
     setFormData({
       taskName: '',
       date: new Date().toISOString().split('T')[0],
@@ -150,7 +161,6 @@ const DailyPlanner = () => {
     showMessage('info', 'Form cleared');
   };
 
-  // Get assigned users from selected task
   const getTaskUsers = () => {
     if (!formData.taskId) return [];
     const selectedTask = tasks.find(task => task._id === formData.taskId);
@@ -167,7 +177,6 @@ const DailyPlanner = () => {
     });
   };
 
-  // Filter today's tasks
   const getTodaysTasks = () => {
     const today = new Date().toISOString().split('T')[0];
     return dailyTasks.filter(task => 
@@ -178,7 +187,12 @@ const DailyPlanner = () => {
   return (
     <div className="form-container">
       <div className="form-header">
-        <h1>Daily Planner</h1>
+        <h1>{isAdmin ? 'Daily Planner' : 'My Daily Tasks'}</h1>
+        {!isAdmin && (
+          <p style={{ color: '#666', fontSize: '14px', marginTop: '8px' }}>
+            Viewing daily tasks assigned to you
+          </p>
+        )}
       </div>
       
       {message.text && (
@@ -187,126 +201,133 @@ const DailyPlanner = () => {
         </div>
       )}
 
-      <form className="project-form" onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Daily Task Name *</label>
-          <input
-            type="text"
-            name="taskName"
-            value={formData.taskName}
-            onChange={handleChange}
-            required
-            placeholder="Enter daily task name"
-          />
-        </div>
-
-        <div className="form-row">
+      {isAdmin && (
+        <form className="project-form" onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Date *</label>
+            <label>Daily Task Name *</label>
             <input
-              type="date"
-              name="date"
-              value={formData.date}
+              type="text"
+              name="taskName"
+              value={formData.taskName}
               onChange={handleChange}
+              required
+              placeholder="Enter daily task name"
+            />
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Date *</label>
+              <input
+                type="date"
+                name="date"
+                value={formData.date}
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Select Task *</label>
+            <select
+              name="taskId"
+              value={formData.taskId}
+              onChange={handleTaskChange}
+              required
+            >
+              <option value="">Select a task</option>
+              {tasks.map(task => (
+                <option key={task._id} value={task._id}>
+                  {task.title} ({task.status})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>Assign Users *</label>
+            <select
+              multiple
+              value={formData.assignedUsers.map(u => u.userId)}
+              onChange={handleUserSelect}
+              required
+              disabled={!formData.taskId}
+              style={{ height: '150px' }}
+            >
+              {formData.taskId ? (
+                getTaskUsers().length > 0 ? (
+                  getTaskUsers().map(user => (
+                    <option key={user.userId} value={user.userId}>
+                      {user.name} ({user.role})
+                    </option>
+                  ))
+                ) : (
+                  <option disabled>No users assigned to this task</option>
+                )
+              ) : (
+                <option disabled>Please select a task first</option>
+              )}
+            </select>
+            <small>Hold Ctrl/Cmd to select multiple users. Selected: {formData.assignedUsers.length} users</small>
+          </div>
+
+          <div className="form-group">
+            <label>Description *</label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              placeholder="Enter daily task description"
+              rows="4"
               required
             />
           </div>
-        </div>
 
-        <div className="form-group">
-          <label>Select Task *</label>
-          <select
-            name="taskId"
-            value={formData.taskId}
-            onChange={handleTaskChange}
-            required
-          >
-            <option value="">Select a task</option>
-            {tasks.map(task => (
-              <option key={task._id} value={task._id}>
-                {task.title} ({task.status})
-              </option>
-            ))}
-          </select>
-        </div>
+          <div className="form-group">
+            <label>Status</label>
+            <select
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+            >
+              <option value="Pending">Pending</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
 
-        <div className="form-group">
-          <label>Assign Users *</label>
-          <select
-            multiple
-            value={formData.assignedUsers.map(u => u.userId)}
-            onChange={handleUserSelect}
-            required
-            disabled={!formData.taskId}
-            style={{ height: '150px' }}
-          >
-            {formData.taskId ? (
-              getTaskUsers().length > 0 ? (
-                getTaskUsers().map(user => (
-                  <option key={user.userId} value={user.userId}>
-                    {user.name} ({user.role})
-                  </option>
-                ))
-              ) : (
-                <option disabled>No users assigned to this task</option>
-              )
-            ) : (
-              <option disabled>Please select a task first</option>
-            )}
-          </select>
-          <small>Hold Ctrl/Cmd to select multiple users. Selected: {formData.assignedUsers.length} users</small>
-        </div>
+          <div className="form-actions">
+            <button 
+              type="button" 
+              className="btn-secondary" 
+              onClick={handleCancel}
+              disabled={loading}
+            >
+              Clear
+            </button>
+            <button 
+              type="submit" 
+              className="btn-primary" 
+              disabled={loading}
+            >
+              {loading ? 'Creating...' : 'Create Daily Task'}
+            </button>
+          </div>
+        </form>
+      )}
 
-        <div className="form-group">
-          <label>Description *</label>
-          <textarea
-            name="description"
-            value={formData.description}
-            onChange={handleChange}
-            placeholder="Enter daily task description"
-            rows="4"
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Status</label>
-          <select
-            name="status"
-            value={formData.status}
-            onChange={handleChange}
-          >
-            <option value="Pending">Pending</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Completed">Completed</option>
-          </select>
-        </div>
-
-        <div className="form-actions">
-          <button 
-            type="button" 
-            className="btn-secondary" 
-            onClick={handleCancel}
-            disabled={loading}
-          >
-            Clear
-          </button>
-          <button 
-            type="submit" 
-            className="btn-primary" 
-            disabled={loading}
-          >
-            {loading ? 'Creating...' : 'Create Daily Task'}
-          </button>
-        </div>
-      </form>
-
-      {/* Display Daily Tasks */}
-      <div style={{ marginTop: '3rem' }}>
-        <h2 style={{ color: '#0e666a', marginBottom: '1.5rem' }}>Today's Daily Tasks</h2>
+      <div style={{ marginTop: isAdmin ? '3rem' : '1rem' }}>
+        <h2 style={{ color: '#0e666a', marginBottom: '1.5rem' }}>
+          {isAdmin ? "Today's Daily Tasks" : "Your Today's Tasks"}
+        </h2>
         {getTodaysTasks().length === 0 ? (
           <div className="empty-state">
-            <p>No daily tasks for today. Create your first daily task above.</p>
+            <p>
+              {isAdmin 
+                ? 'No daily tasks for today. Create your first daily task above.' 
+                : 'No daily tasks assigned to you for today.'}
+            </p>
           </div>
         ) : (
           <div className="projects-grid">

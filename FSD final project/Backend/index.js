@@ -1,5 +1,4 @@
-// ================= EMERGENCY FIX - BACKEND INDEX.JS =================
-// This version has enhanced error handling for the specific issues you're facing
+// ================= UPDATED BACKEND WITH USER-SPECIFIC FILTERING =================
 
 const express = require("express");
 const mongoose = require("mongoose");
@@ -217,7 +216,6 @@ app.get("/projects/:id", async (req, res) => {
       return res.status(503).json({ message: "Server is initializing, please try again" });
     }
     
-    // Validate MongoDB ObjectId format
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: "Invalid project ID format" });
     }
@@ -279,13 +277,29 @@ app.delete("/projects/delete/:id", async (req, res) => {
 
 // ================= USER MANAGEMENT =================
 
+app.post("/users/add", async (req, res) => {
+  try {
+    if (!userModel) {
+      return res.status(503).json({ message: "Server is initializing, please try again" });
+    }
+    
+    console.log("👤 Creating user:", req.body.name);
+    const user = await userModel.create(req.body);
+    console.log("✅ User created:", user._id);
+    res.json({ message: "User added successfully!", user });
+  } catch (error) {
+    console.error("❌ Error adding user:", error);
+    res.status(500).json({ message: "Error adding user", error: error.message });
+  }
+});
+
 app.get("/users", async (req, res) => {
   try {
     if (!userModel) {
       return res.status(503).json({ message: "Server is initializing, please try again" });
     }
     
-    const users = await userModel.find({}, { password: 0 });
+    const users = await userModel.find();
     console.log(`👥 Fetched ${users.length} users`);
     res.json(users);
   } catch (error) {
@@ -294,37 +308,24 @@ app.get("/users", async (req, res) => {
   }
 });
 
-app.post("/users/add", async (req, res) => {
+app.get("/users/:id", async (req, res) => {
   try {
     if (!userModel) {
       return res.status(503).json({ message: "Server is initializing, please try again" });
     }
     
-    const { name, employeeCode, email, password, role } = req.body;
-    
-    console.log("👤 Creating user:", email);
-    
-    const existingUser = await userModel.findOne({ $or: [{ email }, { employeeCode }] });
-    if (existingUser) {
-      return res.status(400).json({ message: "User with this email or employee code already exists" });
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid user ID format" });
     }
     
-    const newUser = await userModel.create({
-      name,
-      employeeCode,
-      email,
-      password,
-      role
-    });
-    
-    console.log("✅ User created:", newUser._id);
-    res.json({ 
-      message: "User created successfully", 
-      user: { ...newUser._doc, password: undefined }
-    });
+    const user = await userModel.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json(user);
   } catch (error) {
-    console.error("❌ Error adding user:", error);
-    res.status(500).json({ message: "Error adding user", error: error.message });
+    console.error("❌ Error fetching user:", error);
+    res.status(500).json({ message: "Error fetching user", error: error.message });
   }
 });
 
@@ -343,7 +344,7 @@ app.put("/users/update/:id", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
     console.log("✅ User updated:", req.params.id);
-    res.json({ message: "User updated successfully", user: { ...updated._doc, password: undefined } });
+    res.json({ message: "User updated successfully", user: updated });
   } catch (error) {
     console.error("❌ Error updating user:", error);
     res.status(500).json({ message: "Error updating user", error: error.message });
@@ -372,7 +373,7 @@ app.delete("/users/delete/:id", async (req, res) => {
   }
 });
 
-// ================= TASK MANAGEMENT =================
+// ================= TASK MANAGEMENT (USER-SPECIFIC) =================
 
 app.post("/tasks/add", async (req, res) => {
   try {
@@ -383,23 +384,40 @@ app.post("/tasks/add", async (req, res) => {
     console.log("✏️ Creating task:", req.body.title);
     const task = await taskModel.create(req.body);
     console.log("✅ Task created:", task._id);
-    res.json({ message: "Task added successfully", task });
+    res.json({ message: "Task added successfully!", task });
   } catch (error) {
     console.error("❌ Error adding task:", error);
     res.status(500).json({ message: "Error adding task", error: error.message });
   }
 });
 
+// 🔥 USER-SPECIFIC: Fetch tasks based on user role
 app.get("/tasks", async (req, res) => {
   try {
     if (!taskModel) {
       return res.status(503).json({ message: "Server is initializing, please try again" });
     }
     
-    const tasks = await taskModel.find()
-      .populate('sprintId', 'sprintName')
-      .populate('projectId', 'name');
-    console.log(`📝 Fetched ${tasks.length} tasks`);
+    const { userId, role } = req.query;
+    
+    let tasks;
+    
+    // If Admin or no userId provided, return all tasks
+    if (!userId || role === "Admin") {
+      tasks = await taskModel.find()
+        .populate('projectId', 'name')
+        .populate('sprintId', 'sprintName');
+      console.log(`📋 Admin: Fetched ${tasks.length} tasks`);
+    } else {
+      // For regular users, only return tasks they are assigned to
+      tasks = await taskModel.find({
+        'assignedTo.userId': userId
+      })
+        .populate('projectId', 'name')
+        .populate('sprintId', 'sprintName');
+      console.log(`📋 User ${userId}: Fetched ${tasks.length} assigned tasks`);
+    }
+    
     res.json(tasks);
   } catch (error) {
     console.error("❌ Error fetching tasks:", error);
@@ -407,34 +425,27 @@ app.get("/tasks", async (req, res) => {
   }
 });
 
-app.get("/tasks/sprint/:sprintId", async (req, res) => {
+app.get("/tasks/:id", async (req, res) => {
   try {
     if (!taskModel) {
       return res.status(503).json({ message: "Server is initializing, please try again" });
     }
     
-    const tasks = await taskModel.find({ sprintId: req.params.sprintId })
-      .populate('assignedTo', 'name employeeCode role');
-    res.json(tasks);
-  } catch (error) {
-    console.error("❌ Error fetching tasks:", error);
-    res.status(500).json({ message: "Error fetching tasks", error: error.message });
-  }
-});
-
-app.get("/tasks/project/:projectId", async (req, res) => {
-  try {
-    if (!taskModel) {
-      return res.status(503).json({ message: "Server is initializing, please try again" });
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid task ID format" });
     }
     
-    const tasks = await taskModel.find({ projectId: req.params.projectId })
+    const task = await taskModel.findById(req.params.id)
+      .populate('projectId', 'name')
       .populate('sprintId', 'sprintName')
-      .populate('assignedTo', 'name employeeCode role');
-    res.json(tasks);
+      .populate('assignedTo.userId', 'name employeeCode role');
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+    res.json(task);
   } catch (error) {
-    console.error("❌ Error fetching tasks:", error);
-    res.status(500).json({ message: "Error fetching tasks", error: error.message });
+    console.error("❌ Error fetching task:", error);
+    res.status(500).json({ message: "Error fetching task", error: error.message });
   }
 });
 
@@ -482,48 +493,51 @@ app.delete("/tasks/delete/:id", async (req, res) => {
   }
 });
 
-// ================= SPRINT MANAGEMENT =================
+// ================= SPRINT MANAGEMENT (USER-SPECIFIC) =================
 
 app.post("/sprints/add", async (req, res) => {
   try {
     if (!sprintModel) {
-      console.error("⚠️  Sprint model not loaded!");
-      return res.status(503).json({ 
-        message: "Server is still initializing. Please wait a moment and try again.",
-        modelStatus: "not loaded"
-      });
+      return res.status(503).json({ message: "Server is initializing, please try again" });
     }
     
     console.log("🏃 Creating sprint:", req.body.sprintName);
-    console.log("📦 Sprint data:", JSON.stringify(req.body, null, 2));
-    
     const sprint = await sprintModel.create(req.body);
-    console.log("✅ Sprint created successfully:", sprint._id);
-    
-    res.json({ 
-      message: "Sprint added successfully!", 
-      sprint: sprint 
-    });
+    console.log("✅ Sprint created:", sprint._id);
+    res.json({ message: "Sprint added successfully!", sprint });
   } catch (error) {
     console.error("❌ Error adding sprint:", error);
-    console.error("❌ Error stack:", error.stack);
-    
-    res.status(500).json({ 
-      message: "Error adding sprint", 
-      error: error.message,
-      details: error.toString()
-    });
+    res.status(500).json({ message: "Error adding sprint", error: error.message });
   }
 });
 
+// 🔥 USER-SPECIFIC: Fetch sprints based on user role
 app.get("/sprints", async (req, res) => {
   try {
     if (!sprintModel) {
       return res.status(503).json({ message: "Server is initializing, please try again" });
     }
     
-    const sprints = await sprintModel.find().populate('assignedUsers', 'name employeeCode role');
-    console.log(`🏃 Fetched ${sprints.length} sprints`);
+    const { userId, role } = req.query;
+    
+    let sprints;
+    
+    // If Admin or no userId provided, return all sprints
+    if (!userId || role === "Admin") {
+      sprints = await sprintModel.find()
+        .populate('projectId', 'name')
+        .populate('assignedUsers.userId', 'name employeeCode role');
+      console.log(`🏃 Admin: Fetched ${sprints.length} sprints`);
+    } else {
+      // For regular users, only return sprints they are assigned to
+      sprints = await sprintModel.find({
+        'assignedUsers.userId': userId
+      })
+        .populate('projectId', 'name')
+        .populate('assignedUsers.userId', 'name employeeCode role');
+      console.log(`🏃 User ${userId}: Fetched ${sprints.length} assigned sprints`);
+    }
+    
     res.json(sprints);
   } catch (error) {
     console.error("❌ Error fetching sprints:", error);
@@ -541,7 +555,9 @@ app.get("/sprints/:id", async (req, res) => {
       return res.status(400).json({ message: "Invalid sprint ID format" });
     }
     
-    const sprint = await sprintModel.findById(req.params.id).populate('assignedUsers', 'name employeeCode role');
+    const sprint = await sprintModel.findById(req.params.id)
+      .populate('projectId', 'name')
+      .populate('assignedUsers.userId', 'name employeeCode role');
     if (!sprint) {
       return res.status(404).json({ message: "Sprint not found" });
     }
@@ -596,7 +612,7 @@ app.delete("/sprints/delete/:id", async (req, res) => {
   }
 });
 
-// ================= DAILY TASK MANAGEMENT =================
+// ================= DAILY TASK MANAGEMENT (USER-SPECIFIC) =================
 
 app.post("/daily-tasks/add", async (req, res) => {
   try {
@@ -614,16 +630,33 @@ app.post("/daily-tasks/add", async (req, res) => {
   }
 });
 
+// 🔥 USER-SPECIFIC: Fetch daily tasks based on user role
 app.get("/daily-tasks", async (req, res) => {
   try {
     if (!dailyTaskModel) {
       return res.status(503).json({ message: "Server is initializing, please try again" });
     }
     
-    const dailyTasks = await dailyTaskModel.find()
-      .populate('taskId', 'title')
-      .populate('assignedUsers', 'name employeeCode role');
-    console.log(`📅 Fetched ${dailyTasks.length} daily tasks`);
+    const { userId, role } = req.query;
+    
+    let dailyTasks;
+    
+    // If Admin or no userId provided, return all daily tasks
+    if (!userId || role === "Admin") {
+      dailyTasks = await dailyTaskModel.find()
+        .populate('taskId', 'title')
+        .populate('assignedUsers.userId', 'name employeeCode role');
+      console.log(`📅 Admin: Fetched ${dailyTasks.length} daily tasks`);
+    } else {
+      // For regular users, only return daily tasks they are assigned to
+      dailyTasks = await dailyTaskModel.find({
+        'assignedUsers.userId': userId
+      })
+        .populate('taskId', 'title')
+        .populate('assignedUsers.userId', 'name employeeCode role');
+      console.log(`📅 User ${userId}: Fetched ${dailyTasks.length} assigned daily tasks`);
+    }
+    
     res.json(dailyTasks);
   } catch (error) {
     console.error("❌ Error fetching daily tasks:", error);
@@ -643,7 +676,7 @@ app.get("/daily-tasks/:id", async (req, res) => {
     
     const dailyTask = await dailyTaskModel.findById(req.params.id)
       .populate('taskId', 'title')
-      .populate('assignedUsers', 'name employeeCode role');
+      .populate('assignedUsers.userId', 'name employeeCode role');
     if (!dailyTask) {
       return res.status(404).json({ message: "Daily task not found" });
     }
@@ -712,8 +745,9 @@ app.use((req, res, next) => {
       "GET /api/debug/db",
       "POST /login",
       "GET /projects",
-      "POST /sprints/add",
-      "GET /sprints",
+      "GET /tasks?userId=xxx&role=xxx",
+      "GET /sprints?userId=xxx&role=xxx",
+      "GET /daily-tasks?userId=xxx&role=xxx",
       "etc..."
     ]
   });

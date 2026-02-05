@@ -9,6 +9,10 @@ const Sprint = () => {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [loading, setLoading] = useState(false);
   
+  // Get current user info
+  const currentUser = JSON.parse(localStorage.getItem('user'));
+  const isAdmin = currentUser?.role === 'Admin';
+  
   const [formData, setFormData] = useState({
     sprintName: '',
     description: '',
@@ -27,7 +31,13 @@ const Sprint = () => {
 
   const fetchSprints = async () => {
     try {
-      const response = await fetch('http://localhost:3008/sprints');
+      const url = new URL('http://localhost:3008/sprints');
+      if (currentUser) {
+        url.searchParams.append('userId', currentUser.userId);
+        url.searchParams.append('role', currentUser.role);
+      }
+      
+      const response = await fetch(url);
       const data = await response.json();
       setSprints(data);
     } catch (error) {
@@ -67,7 +77,6 @@ const Sprint = () => {
     const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
     const selectedUserObjects = users.filter(user => selectedOptions.includes(user._id));
     
-    // Format assignedUsers as expected by backend
     const assignedUsers = selectedUserObjects.map(user => ({
       userId: user._id,
       name: user.name,
@@ -88,10 +97,9 @@ const Sprint = () => {
     setLoading(true);
 
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
       const sprintData = {
         ...formData,
-        createdBy: user.userId
+        createdBy: currentUser.userId
       };
 
       const response = await fetch('http://localhost:3008/sprints/add', {
@@ -113,7 +121,7 @@ const Sprint = () => {
           projectId: '',
           status: 'Planning'
         });
-        fetchSprints(); // Refresh sprint list
+        fetchSprints();
       } else {
         showMessage('error', result.message || 'Error creating sprint');
       }
@@ -126,7 +134,6 @@ const Sprint = () => {
   };
 
   const handleCancel = () => {
-    // Reset form
     setFormData({
       sprintName: '',
       description: '',
@@ -152,7 +159,12 @@ const Sprint = () => {
   return (
     <div className="form-container">
       <div className="form-header">
-        <h1>Create Sprint</h1>
+        <h1>{isAdmin ? 'Create Sprint' : 'My Sprints'}</h1>
+        {!isAdmin && (
+          <p style={{ color: '#666', fontSize: '14px', marginTop: '8px' }}>
+            Viewing sprints you are assigned to
+          </p>
+        )}
       </div>
       
       {message.text && (
@@ -161,128 +173,135 @@ const Sprint = () => {
         </div>
       )}
 
-      <form className="project-form" onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Sprint Name *</label>
-          <input
-            type="text"
-            name="sprintName"
-            value={formData.sprintName}
-            onChange={handleChange}
-            required
-            placeholder="Enter sprint name"
-          />
-        </div>
-
-        <div className="form-row">
+      {isAdmin && (
+        <form className="project-form" onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Start Date *</label>
+            <label>Sprint Name *</label>
             <input
-              type="date"
-              name="startDate"
-              value={formData.startDate}
+              type="text"
+              name="sprintName"
+              value={formData.sprintName}
               onChange={handleChange}
+              required
+              placeholder="Enter sprint name"
+            />
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Start Date *</label>
+              <input
+                type="date"
+                name="startDate"
+                value={formData.startDate}
+                onChange={handleChange}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>End Date *</label>
+              <input
+                type="date"
+                name="endDate"
+                value={formData.endDate}
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Select Project *</label>
+            <select
+              name="projectId"
+              value={formData.projectId}
+              onChange={handleChange}
+              required
+            >
+              <option value="">Select a project</option>
+              {projects.map(project => (
+                <option key={project._id} value={project._id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>Assign Users *</label>
+            <select
+              multiple
+              value={formData.assignedUsers.map(u => u.userId)}
+              onChange={handleUserSelect}
+              required
+              style={{ height: '150px' }}
+            >
+              {users.map(user => (
+                <option key={user._id} value={user._id}>
+                  {user.name} - {user.role} ({user.employeeCode})
+                </option>
+              ))}
+            </select>
+            <small>Hold Ctrl/Cmd to select multiple users. Selected: {formData.assignedUsers.length} users</small>
+          </div>
+
+          <div className="form-group">
+            <label>Description *</label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              placeholder="Enter sprint description"
+              rows="4"
               required
             />
           </div>
+
           <div className="form-group">
-            <label>End Date *</label>
-            <input
-              type="date"
-              name="endDate"
-              value={formData.endDate}
+            <label>Status</label>
+            <select
+              name="status"
+              value={formData.status}
               onChange={handleChange}
-              required
-            />
+            >
+              <option value="Planning">Planning</option>
+              <option value="Active">Active</option>
+              <option value="Completed">Completed</option>
+              <option value="On Hold">On Hold</option>
+            </select>
           </div>
-        </div>
 
-        <div className="form-group">
-          <label>Select Project *</label>
-          <select
-            name="projectId"
-            value={formData.projectId}
-            onChange={handleChange}
-            required
-          >
-            <option value="">Select a project</option>
-            {projects.map(project => (
-              <option key={project._id} value={project._id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-        </div>
+          <div className="form-actions">
+            <button 
+              type="button" 
+              className="btn-secondary" 
+              onClick={handleCancel}
+              disabled={loading}
+            >
+              Clear
+            </button>
+            <button 
+              type="submit" 
+              className="btn-primary" 
+              disabled={loading}
+            >
+              {loading ? 'Creating...' : 'Create Sprint'}
+            </button>
+          </div>
+        </form>
+      )}
 
-        <div className="form-group">
-          <label>Assign Users *</label>
-          <select
-            multiple
-            value={formData.assignedUsers.map(u => u.userId)}
-            onChange={handleUserSelect}
-            required
-            style={{ height: '150px' }}
-          >
-            {users.map(user => (
-              <option key={user._id} value={user._id}>
-                {user.name} - {user.role} ({user.employeeCode})
-              </option>
-            ))}
-          </select>
-          <small>Hold Ctrl/Cmd to select multiple users. Selected: {formData.assignedUsers.length} users</small>
-        </div>
-
-        <div className="form-group">
-          <label>Description *</label>
-          <textarea
-            name="description"
-            value={formData.description}
-            onChange={handleChange}
-            placeholder="Enter sprint description"
-            rows="4"
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Status</label>
-          <select
-            name="status"
-            value={formData.status}
-            onChange={handleChange}
-          >
-            <option value="Planning">Planning</option>
-            <option value="Active">Active</option>
-            <option value="Completed">Completed</option>
-            <option value="On Hold">On Hold</option>
-          </select>
-        </div>
-
-        <div className="form-actions">
-          <button 
-            type="button" 
-            className="btn-secondary" 
-            onClick={handleCancel}
-            disabled={loading}
-          >
-            Clear
-          </button>
-          <button 
-            type="submit" 
-            className="btn-primary" 
-            disabled={loading}
-          >
-            {loading ? 'Creating...' : 'Create Sprint'}
-          </button>
-        </div>
-      </form>
-
-      {/* Display Created Sprints */}
-      <div style={{ marginTop: '3rem' }}>
-        <h2 style={{ color: '#0e666a', marginBottom: '1.5rem' }}>Created Sprints</h2>
+      <div style={{ marginTop: isAdmin ? '3rem' : '1rem' }}>
+        <h2 style={{ color: '#0e666a', marginBottom: '1.5rem' }}>
+          {isAdmin ? 'All Sprints' : 'Your Assigned Sprints'}
+        </h2>
         {sprints.length === 0 ? (
           <div className="empty-state">
-            <p>No sprints created yet. Create your first sprint above.</p>
+            <p>
+              {isAdmin 
+                ? 'No sprints created yet. Create your first sprint above.' 
+                : 'No sprints assigned to you yet.'}
+            </p>
           </div>
         ) : (
           <div className="projects-grid">
